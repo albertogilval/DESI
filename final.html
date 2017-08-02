@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>D3 Test</title>
+		<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+		<link type="text/css" rel="stylesheet" href="./css/estilos.css"/>
+
+	</head>
+	<body>
+		<div id="all" style="width: 1100px; height: 450px"></div>
+		<script type="text/javascript">
+
+		var first_year;
+		var number_years;
+		var energy_type;
+		var place = "Total";
+		var places;
+		var max;
+
+		//create SVG and graph
+		function createSVG(energy_type, number_years, first_year,place, places, data){
+
+			places = orderPlaces(places,place);
+
+			var width = 850;
+			var height = 400;
+
+			var max = getMax(energy_type.renewable_energy,energy_type.non_renewable_energy);
+
+			var data_distance = 770/number_years;
+			var change_factor = 340/Math.max(max,1);
+			var tx = 75;
+			var ty = 370;
+			var colors = ["#009900","#990000"];
+			var type = ["energia renovable", "energia no renovable"];
+
+			var widthC = 230;
+			var heightC = 200;
+
+			var x = d3.scale.linear().domain([parseInt(first_year),parseInt(first_year)+parseInt(number_years)-1]).range([75,795]);
+
+			var y = d3.scale.linear().domain([0, max]).range([height-30,30]);
+			var xAxis = d3.svg.axis().scale(x).orient("bottom").ticks(number_years);
+
+        	var yAxis = d3.svg.axis().scale(y).orient("left").ticks(5);
+
+			//create SVG
+			var svg = d3.select("#all")
+				.append("svg")
+				.attr("width",width)
+				.attr("height",height)
+				.style('border','2px solid black');
+
+			//bottom axis
+			svg.append("g")
+				.attr("class","axis")
+				.attr("transform","translate(0,"+ty+")")
+				.call(xAxis);
+
+
+			//left axis
+			svg.append("g")
+				.attr("class","axis")
+				.attr("transform","translate("+tx+",0)")
+				.call(yAxis);
+			
+			for(var i=0;i<number_years;i++){
+
+				//renewable energy
+				svg.append("circle")
+					.style("fill",colors[0])
+					.attr("r",4)
+					.attr("cx",tx+i*data_distance)
+					.attr("cy",ty)
+					.transition()
+					.duration(1000)
+					.attr("cy",ty-energy_type.renewable_energy[i]*change_factor)
+					.attr("value",energy_type.renewable_energy[i])
+					.style("fill",colors[0]);
+					
+
+					if(i!=0){
+						svg.append("line")
+							.style("stroke-width",2)
+							.style("stroke",colors[0])
+							.attr("x1",tx+(i-1)*data_distance)
+							.attr("x2",tx+i*data_distance)
+							.attr("y1",ty)
+							.attr("y2",ty)
+							.transition()
+							.duration(1000)
+							.attr("y1",ty-energy_type.renewable_energy[i-1]*change_factor)
+							
+							.attr("y2",ty-energy_type.renewable_energy[i]*change_factor);
+					}
+				//non-renewable energy
+				svg.append("circle")
+					.style("fill",colors[1])
+					.attr("cx",tx+i*data_distance)
+					.attr("cy",0)
+					.transition()
+					.duration(1000)
+					.attr("cy",ty-energy_type.non_renewable_energy[i]*change_factor)
+					.attr("value",energy_type.non_renewable_energy[i])
+					.attr("r",4);
+
+					if(i!=0){
+						svg.append("line")
+							.style("stroke-width",2)
+							.style("stroke",colors[1])
+							.attr("x1",tx+(i-1)*data_distance)
+							.attr("x2",tx+i*data_distance)
+							.attr("y1",0)
+							.attr("y2",0)
+							.transition()
+							.duration(1000)
+							.attr("y1",ty-energy_type.non_renewable_energy[i-1]*change_factor)
+							.attr("y2",ty-energy_type.non_renewable_energy[i]*change_factor);
+					}
+			}
+
+			//Caption
+			var svgC = d3.select("#all")
+				.append("svg")
+				.attr("width",widthC)
+				.attr("height",heightC);
+
+			svgC.append("text")
+					.attr("x",widthC/2-50)
+					.attr("y",20)
+					.text(place)
+					.style("font-family","arial")
+					.style("text-decoration","underline")
+					.style("font-size","18px");
+
+			for(i=0;i<2;i++){
+				svgC.append("circle")
+					.attr("cx", 20)
+					.attr("cy",50+i*40)
+					.attr("r",8)
+					.style("fill",colors[i]);
+
+				svgC.append("text")
+					.attr("x",40)
+					.attr("y",56+i*40)
+					.text(type[i])
+					.style("font-family","arial")
+					.style("font-weight","bold")
+					.style("font-size","18px");
+			}
+
+
+			//menu
+			var select = d3.select('div')
+				.attr("id","all")
+          		.append('select')
+            	.attr('class','select')
+            	.on('change',onchange)
+
+        	var options = select
+	          	.selectAll('option')
+	            .data(places).enter()
+	            .append('option')
+	                .text(function (d) { return d; });
+
+	        function onchange() {
+	            place = d3.select('select').property('value')
+	            d3.selectAll("svg").remove();
+	            d3.selectAll("text").remove();
+	            d3.selectAll('select').remove();
+	            energy_type = groupData(data,number_years,first_year,place);
+	            createSVG(energy_type,number_years,first_year,place,places,data);
+	        };
+			
+		}
+
+		//return the first year of the dataset
+		function firstYear(data){
+
+			var year = data[0].Fecha_validez;
+			for(i=0;i<data.length;i++){
+
+				if(data[i].Fecha_validez<year){
+					year=parseInt(data[i].Fecha_validez);
+				}
+			}
+			return year;
+		}
+
+		//return the number of years between the max and min
+		function nYears(data,first_year){
+
+			var year=0;
+			for (i=0;i<data.length;i++){
+				if(parseInt(data[i].Fecha_validez)>year){
+					year=parseInt(data[i].Fecha_validez);
+				}
+			}
+			return parseInt(year-first_year)+1;
+		}
+
+		//group energy in renewable and non-renewable
+		function groupData(data,number_years,first_year,place){
+
+			energy_type={renewable_energy:[],non_renewable_energy:[]};
+			//initialize the data with 0"s
+			for(i=0;i<number_years;i++){
+				energy_type.renewable_energy[i] = 0;
+				energy_type.non_renewable_energy[i] = 0;
+			}
+			if (place == "Total"){
+				//non-renewable energy
+				for(i=0;i<data.length;i++){
+					if(data[i].Indicador =="Produccion de energia con carbon"){
+						energy_type.non_renewable_energy[data[i].Fecha_validez-first_year]+=parseInt(data[i].Valor);
+					}
+					if(data[i].Indicador =="Producción de energía nuclear"){
+						energy_type.non_renewable_energy[data[i].Fecha_validez-first_year]+=parseInt(data[i].Valor);
+					}
+				
+					//renewable energy
+					
+					if(data[i].Indicador =="Produccion de energia eolica"){
+						energy_type.renewable_energy[data[i].Fecha_validez-first_year]+=parseInt(data[i].Valor);
+					}
+					if(data[i].Indicador =="Produccion de energia hidraulica"){
+						energy_type.renewable_energy[data[i].Fecha_validez-first_year]+=parseInt(data[i].Valor);
+					}
+					if(data[i].Indicador =="Produccion energia solar en Castilla y Leon"){
+						energy_type.renewable_energy[data[i].Fecha_validez-first_year]+=parseInt(data[i].Valor);
+					}
+				}
+			}
+			
+				//non-renewable energy
+				for(i=0;i<data.length;i++){
+					if(data[i].Provincia==place){
+						if(data[i].Indicador =="Produccion de energia con carbon"){
+							energy_type.non_renewable_energy[data[i].Fecha_validez-first_year]+=parseInt(data[i].Valor);
+						}
+						if(data[i].Indicador =="Producción de energía nuclear"){
+							energy_type.non_renewable_energy[data[i].Fecha_validez-first_year]+=parseInt(data[i].Valor);
+						}
+
+						//renewable energy
+
+						if(data[i].Indicador =="Produccion de energia eolica"){
+							energy_type.renewable_energy[data[i].Fecha_validez-first_year]+=parseInt(data[i].Valor);
+						}
+						if(data[i].Indicador =="Produccion de energia hidraulica"){
+							energy_type.renewable_energy[data[i].Fecha_validez-first_year]+=parseInt(data[i].Valor);
+						}
+						if(data[i].Indicador =="Produccion energia solar en Castilla y Leon"){
+							energy_type.renewable_energy[data[i].Fecha_validez-first_year]+=parseInt(data[i].Valor);
+						}
+					}
+				}
+			return energy_type;
+		}
+
+		//return the maximun of the 2 sets
+		function getMax(data,data2){
+			var max1=0;
+			for(i=0;i<data.length;i++){
+				if(max1<data[i]){
+					max1=data[i];
+				}
+			}
+			if(data2!=null){
+				for(i=0;i<data2.length;i++){
+					if(max1<data2[i]){
+						max1=data2[i];
+					}
+				}
+			}
+			return max1;
+		}
+
+		//return true if place is in array
+		function isIn(array,place){
+
+			for(i=0;i<array.length;i++){
+				if(place==array[i]){
+					return true;
+				}
+			}
+			return false;
+		}
+
+		//return the places that appear on the dataset
+		function getPlaces(data){
+
+			var places = ["Total"];
+			var place;
+			for(j=0;j<data.length;j++){
+				place = data[j].Provincia;
+				if(!isIn(places,place)){
+					places[places.length]=place;
+				}
+			}
+			return places;
+		}
+
+		//order the set placeing place on first place
+		function orderPlaces(places, place){
+			
+			var array = [];
+			var temp;
+			array[0]=place;
+
+			for(i=0;i<places.length;i++){
+				temp=places[i];
+				if(!isIn(array,temp)){
+					array[array.length]=temp;
+				}
+			}
+			return array;
+		}
+
+		d3.csv("./datos/Produccion_energia3.csv",function(error, data){
+				
+				first_year = firstYear(data);
+				number_years = nYears(data,first_year);
+
+				energy_type = groupData(data,number_years,first_year,place);
+				places = getPlaces(data);
+				createSVG(energy_type,number_years,first_year,place,places,data);
+				
+				
+			});
+		</script>
+	</body>
+	</html>
